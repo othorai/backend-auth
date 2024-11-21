@@ -11,6 +11,7 @@ import httpx
 from app.utils.auth import get_current_user, create_access_token, verify_password, get_password_hash
 from app.utils.database import get_db
 from sqlalchemy.orm import Session
+from urllib.parse import unquote
 from app.models.models import User, Organization, InteractionHistory, LikedPost, Article
 from app.schemas.schemas import (
     UserCreate, User as UserSchema, Token, ChatHistoryResponse,
@@ -535,25 +536,40 @@ async def gateway_router_get(
 ):
     """Gateway router for GET requests with enhanced path handling"""
     try:
-        logger.info(f"GET request - Prefix: {prefix}, Path: {path}")
-        logger.info(f"User context - ID: {current_user['user'].id}, Role: {current_user['user'].role}")
+        # Handle different URL encoding scenarios
+        decoded_prefix = unquote(prefix).replace('%2F', '/')
+        decoded_path = unquote(path).replace('%2F', '/')
         
-        service_url = ROUTE_SERVICES.get(prefix)
+        combined_prefix = None
+        path_segments = decoded_path.split('/')
+        if path_segments:
+            combined_prefix = f"{decoded_prefix}/{path_segments[0]}"
+            
+        # First try the combined prefix, then fall back to original prefix
+        service_url = (
+            ROUTE_SERVICES.get(combined_prefix) or 
+            ROUTE_SERVICES.get(decoded_prefix) or 
+            ROUTE_SERVICES.get(decoded_prefix.lower())
+        )
+        
         if not service_url:
             available_services = list(ROUTE_SERVICES.keys())
-            logger.error(f"Service not found for prefix '{prefix}'. Available: {available_services}")
             raise HTTPException(
                 status_code=404,
-                detail=f"Service '{prefix}' not found. Available services: {available_services}"
+                detail=f"Service '{decoded_prefix}' not found. Available services: {available_services}"
             )
         
-        logger.info(f"Routing GET to service: {service_url}")
-        
+        # Adjust the forward path based on whether we used the combined prefix
+        if combined_prefix and service_url == ROUTE_SERVICES.get(combined_prefix):
+            # Remove the first path segment since it's part of the prefix
+            forward_path = '/' + '/'.join(path_segments[1:])
+        else:
+            forward_path = '/' + decoded_path
+            
         # Clean and normalize the path
-        clean_path = path.lstrip('/') if path else ''
-        forward_path = f"/{clean_path}" if clean_path else '/'
-        
-        logger.info(f"Forwarding to: {service_url}{forward_path}")
+        forward_path = forward_path.rstrip('/')
+        if not forward_path:
+            forward_path = '/'
         
         return await forward_request(
             request=request,
@@ -577,19 +593,55 @@ async def gateway_router_post(
     current_user: Dict = Depends(get_current_user)
 ):
     """Gateway router for POST requests"""
+    
     try:
-        logger.info(f"POST request - Prefix: {prefix}, Path: {path}")
-        logger.info(f"User context - ID: {current_user['user'].id}, Role: {current_user['user'].role}")
+        decoded_prefix = unquote(prefix).replace('%2F', '/')
+        decoded_path = unquote(path).replace('%2F', '/')
+
+        service_url = None
+        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            service_url = ROUTE_SERVICES.get("api/v1")
+        else:
+            debug_info["routing"] = {
+                "no_match": True,
+                "tried_prefix": decoded_prefix
+            }
+
+        if not service_url:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "Service not found",
+                }
+            )
+
+
+        forward_path = decoded_path
+        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            forward_path = decoded_path[3:]
+
+        return await forward_request(
+            request=request,
+            service_url=service_url,
+            path=forward_path,
+            current_user=current_user
+        )
         
-        service_url = await get_service_url(prefix)
-        logger.info(f"Routing POST to service: {service_url}")
-        
-        return await forward_request(request, service_url, f"/{path}", current_user)
     except Exception as e:
-        logger.exception(f"Error in POST router: {str(e)}")
+        error_info = {
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+        }
+        
         if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=f"Gateway POST error: {str(e)}")
+            raise HTTPException(
+                status_code=e.status_code,
+                detail=error_info
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=error_info
+        )
 
 @app.put("/{prefix}/{path:path}")
 async def gateway_router_put(
@@ -600,15 +652,28 @@ async def gateway_router_put(
 ):
     """Gateway router for PUT requests"""
     try:
-        logger.info(f"PUT request - Prefix: {prefix}, Path: {path}")
-        logger.info(f"User context - ID: {current_user['user'].id}, Role: {current_user['user'].role}")
+        decoded_prefix = unquote(prefix).replace('%2F', '/')
+        decoded_path = unquote(path).replace('%2F', '/')
         
-        service_url = await get_service_url(prefix)
-        logger.info(f"Routing PUT to service: {service_url}")
+        # Try to find service URL
+        service_url = None
+        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            service_url = ROUTE_SERVICES.get("api/v1")
         
-        return await forward_request(request, service_url, f"/{path}", current_user)
+        if not service_url:
+            available_services = list(ROUTE_SERVICES.keys())
+            raise HTTPException(
+                status_code=404,
+                detail=f"Service not found. Available services: {available_services}"
+            )
+
+        # Adjust forward path
+        forward_path = decoded_path
+        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            forward_path = decoded_path[3:]  # Remove "v1/"
+
+        return await forward_request(request, service_url, forward_path, current_user)
     except Exception as e:
-        logger.exception(f"Error in PUT router: {str(e)}")
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=f"Gateway PUT error: {str(e)}")
@@ -622,15 +687,28 @@ async def gateway_router_delete(
 ):
     """Gateway router for DELETE requests"""
     try:
-        logger.info(f"DELETE request - Prefix: {prefix}, Path: {path}")
-        logger.info(f"User context - ID: {current_user['user'].id}, Role: {current_user['user'].role}")
+        decoded_prefix = unquote(prefix).replace('%2F', '/')
+        decoded_path = unquote(path).replace('%2F', '/')
         
-        service_url = await get_service_url(prefix)
-        logger.info(f"Routing DELETE to service: {service_url}")
+        # Try to find service URL
+        service_url = None
+        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            service_url = ROUTE_SERVICES.get("api/v1")
         
-        return await forward_request(request, service_url, f"/{path}", current_user)
+        if not service_url:
+            available_services = list(ROUTE_SERVICES.keys())
+            raise HTTPException(
+                status_code=404,
+                detail=f"Service not found. Available services: {available_services}"
+            )
+
+        # Adjust forward path
+        forward_path = decoded_path
+        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            forward_path = decoded_path[3:]  # Remove "v1/"
+
+        return await forward_request(request, service_url, forward_path, current_user)
     except Exception as e:
-        logger.exception(f"Error in DELETE router: {str(e)}")
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=f"Gateway DELETE error: {str(e)}")
@@ -644,15 +722,28 @@ async def gateway_router_patch(
 ):
     """Gateway router for PATCH requests"""
     try:
-        logger.info(f"PATCH request - Prefix: {prefix}, Path: {path}")
-        logger.info(f"User context - ID: {current_user['user'].id}, Role: {current_user['user'].role}")
+        decoded_prefix = unquote(prefix).replace('%2F', '/')
+        decoded_path = unquote(path).replace('%2F', '/')
         
-        service_url = await get_service_url(prefix)
-        logger.info(f"Routing PATCH to service: {service_url}")
+        # Try to find service URL
+        service_url = None
+        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            service_url = ROUTE_SERVICES.get("api/v1")
         
-        return await forward_request(request, service_url, f"/{path}", current_user)
+        if not service_url:
+            available_services = list(ROUTE_SERVICES.keys())
+            raise HTTPException(
+                status_code=404,
+                detail=f"Service not found. Available services: {available_services}"
+            )
+
+        # Adjust forward path
+        forward_path = decoded_path
+        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            forward_path = decoded_path[3:]  # Remove "v1/"
+
+        return await forward_request(request, service_url, forward_path, current_user)
     except Exception as e:
-        logger.exception(f"Error in PATCH router: {str(e)}")
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=f"Gateway PATCH error: {str(e)}")
