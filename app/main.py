@@ -275,12 +275,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     return current_user["user"]
 
-@app.get("/user/organizations", response_model=List[OrganizationSchema])
+@app.get("/authorization/user/organizations", response_model=List[OrganizationSchema])
 async def get_user_organizations(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     user = current_user["user"]
     return user.organizations
 
-@app.post("/switch-organization/{org_id}", response_model=Token)
+@app.post("/authorization/switch-organization/{org_id}", response_model=Token)
 async def switch_organization(
     org_id: int,
     current_user: dict = Depends(get_current_user),
@@ -298,7 +298,7 @@ async def switch_organization(
     access_token = create_access_token(data={"sub": user.email, "org_id": org_id})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/user/{user_id}/add-organization/{org_id}")
+@app.post("/authorization/user/{user_id}/add-organization/{org_id}")
 async def add_user_to_organization(
     user_id: int,
     org_id: int,
@@ -322,12 +322,8 @@ async def add_user_to_organization(
         return {"message": f"User {user.username} added to organization {org.name}"}
     else:
         return {"message": f"User {user.username} is already a member of organization {org.name}"}
-    
-@app.get("/me", response_model=UserSchema)
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
-    return current_user["user"]
 
-@app.get("/chat-history/{session_id}", response_model=List[ChatHistoryResponse])
+@app.get("/authorization/chat-history/{session_id}", response_model=List[ChatHistoryResponse])
 async def get_chat_history(
     session_id: str,
     current_user: dict = Depends(get_current_user),
@@ -346,7 +342,7 @@ async def get_chat_history(
         ) for interaction in chat_history
     ]
 
-@app.post("/like/{article_id}", response_model=LikedPostResponse)
+@app.post("/authorization/like/{article_id}", response_model=LikedPostResponse)
 async def like_post(
     article_id: uuid.UUID,
     current_user: dict = Depends(get_current_user),
@@ -366,7 +362,7 @@ async def like_post(
         db.rollback()
         return LikedPostResponse(message="Post already liked", liked=True)
 
-@app.delete("/unlike/{article_id}", response_model=LikedPostResponse)
+@app.delete("/authorization/unlike/{article_id}", response_model=LikedPostResponse)
 async def unlike_post(
     article_id: uuid.UUID,
     current_user: dict = Depends(get_current_user),
@@ -384,7 +380,7 @@ async def unlike_post(
     db.commit()
     return LikedPostResponse(message="Post unliked successfully", liked=False)
 
-@app.get("/liked-posts", response_model=List[uuid.UUID])
+@app.get("/authorization/liked-posts", response_model=List[uuid.UUID])
 async def get_liked_posts(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -392,7 +388,7 @@ async def get_liked_posts(
     liked_posts = db.query(LikedPost.article_id).filter(LikedPost.user_id == current_user["user"].id).all()
     return [post.article_id for post in liked_posts]
 
-@app.post("/find-by-email", response_model=UserResponse)
+@app.post("/authorization/find-by-email", response_model=UserResponse)
 async def find_user_by_email(
     email_data: EmailRequest,
     db: Session = Depends(get_db),
@@ -593,55 +589,39 @@ async def gateway_router_post(
     current_user: Dict = Depends(get_current_user)
 ):
     """Gateway router for POST requests"""
-    
     try:
         decoded_prefix = unquote(prefix).replace('%2F', '/')
         decoded_path = unquote(path).replace('%2F', '/')
-
-        service_url = None
-        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
+        
+        # Try to find service URL directly (this will handle hyphenated names)
+        service_url = ROUTE_SERVICES.get(decoded_prefix)
+        
+        # If no direct match, then try the api/v1 special case
+        if not service_url and decoded_prefix == "api" and decoded_path.startswith("v1/"):
             service_url = ROUTE_SERVICES.get("api/v1")
+            forward_path = decoded_path[3:]  # Remove "v1/"
         else:
-            debug_info["routing"] = {
-                "no_match": True,
-                "tried_prefix": decoded_prefix
-            }
+            forward_path = decoded_path
 
         if not service_url:
+            available_services = list(ROUTE_SERVICES.keys())
             raise HTTPException(
                 status_code=404,
-                detail={
-                    "error": "Service not found",
-                }
+                detail=f"Service not found. Available services: {available_services}"
             )
-
-
-        forward_path = decoded_path
-        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
-            forward_path = decoded_path[3:]
 
         return await forward_request(
             request=request,
             service_url=service_url,
             path=forward_path,
-            current_user=current_user
+            current_user=current_user,
+            method="POST"  # Explicitly set method
         )
-        
+
     except Exception as e:
-        error_info = {
-            "error_type": type(e).__name__,
-            "error_message": str(e),
-        }
-        
         if isinstance(e, HTTPException):
-            raise HTTPException(
-                status_code=e.status_code,
-                detail=error_info
-            )
-        raise HTTPException(
-            status_code=500,
-            detail=error_info
-        )
+            raise e
+        raise HTTPException(status_code=500, detail=f"Gateway POST error: {str(e)}")
 
 @app.put("/{prefix}/{path:path}")
 async def gateway_router_put(
@@ -672,7 +652,14 @@ async def gateway_router_put(
         if decoded_prefix == "api" and decoded_path.startswith("v1/"):
             forward_path = decoded_path[3:]  # Remove "v1/"
 
-        return await forward_request(request, service_url, forward_path, current_user)
+        return await forward_request(
+            request=request,
+            service_url=service_url,
+            path=forward_path,
+            current_user=current_user,
+            method="PUT"  # Explicitly set method
+        )
+
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
@@ -707,7 +694,14 @@ async def gateway_router_delete(
         if decoded_prefix == "api" and decoded_path.startswith("v1/"):
             forward_path = decoded_path[3:]  # Remove "v1/"
 
-        return await forward_request(request, service_url, forward_path, current_user)
+        return await forward_request(
+            request=request,
+            service_url=service_url,
+            path=forward_path,
+            current_user=current_user,
+            method="DELETE"  # Explicitly set method
+        )
+
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
@@ -742,7 +736,14 @@ async def gateway_router_patch(
         if decoded_prefix == "api" and decoded_path.startswith("v1/"):
             forward_path = decoded_path[3:]  # Remove "v1/"
 
-        return await forward_request(request, service_url, forward_path, current_user)
+        return await forward_request(
+            request=request,
+            service_url=service_url,
+            path=forward_path,
+            current_user=current_user,
+            method="PATCH"  # Explicitly set method
+        )
+
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
