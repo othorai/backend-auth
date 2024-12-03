@@ -46,12 +46,12 @@ app.add_middleware(
 
 # Route prefixes and their corresponding services
 ROUTE_SERVICES = {
-    'narrative': os.getenv('NARRATIVE_SERVICE_URL', 'http://backend-narrative-and-dataso-alb-338209897.eu-north-1.elb.amazonaws.com'),
-    'api/v1': os.getenv('ORGANIZATIONS_SERVICE_URL', 'http://backend-organizations-alb-1221197978.eu-north-1.elb.amazonaws.com'),
-    'metrics': os.getenv('METRICS_SERVICE_URL', 'http://backend-metrics-alb-2126861032.eu-north-1.elb.amazonaws.com'),
-    'chatbot': os.getenv('CHATBOT_SERVICE_URL', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com'),
-    'data-source': os.getenv('DATA_SOURCE_SERVICE_URL', 'http://backend-narrative-and-dataso-alb-338209897.eu-north-1.elb.amazonaws.com'),
-    'metric-discovery': os.getenv('METRIC_DISCOVERY_SERVICE_URL', 'http://backend-metric-discovery-alb-413666994.eu-north-1.elb.amazonaws.com')
+    'narrative': os.getenv('NARRATIVE_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-narrative-and-datasource'),
+    'api/v1': os.getenv('ORGANIZATIONS_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-organizations'),
+    'metrics': os.getenv('METRICS_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-metrics'),
+    'chatbot': os.getenv('CHATBOT_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com'),
+    'data-source': os.getenv('DATA_SOURCE_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-narrative-and-datasource'),
+    'metric-discovery': os.getenv('METRIC_DISCOVERY_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-metric-discovery')
 }
 
 oauth2_scheme = OAuth2PasswordBearer(
