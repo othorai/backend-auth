@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     # AWS settings
     AWS_REGION: str = "eu-north-1"
     AWS_ACCOUNT_ID: str = "533267025675"
-    AWS_ACCESS_KEY_ID: str | None = None
-    AWS_SECRET_ACCESS_KEY: str | None = None
+    AWS_ACCESS_KEY_ID: str  
+    AWS_SECRET_ACCESS_KEY: str
     APP_NAME: str = "backend-authorization-gateway"
     CLUSTER_NAME: str = "backend-authorization-gateway-cluster"
     SERVICE_NAME: str = "backend-authorization-gateway-service"
@@ -38,25 +38,25 @@ class Settings(BaseSettings):
     ECS_CONTAINER_PORT: str = "8000"
 
     # VPC Configuration
-    VPC_ID: str | None = None
-    VPC_SUBNET_1: str | None = None
-    VPC_SUBNET_2: str | None = None
-    SECURITY_GROUP: str | None = None
+    VPC_ID: str  
+    VPC_SUBNET_1: str  
+    VPC_SUBNET_2: str  
+    SECURITY_GROUP: str  
 
     # Service URLs
-    AUTH_SERVICE_NAME: str | None = None
-    SERVICE_KEY_SALT: str | None = None
-    NARRATIVE_SERVICE_URL: str | None = None
-    CHATBOT_SERVICE_URL: str | None = None
-    METRIC_DISCOVERY_SERVICE_URL: str | None = None
-    METRICS_SERVICE_URL: str | None = None
-    ORGANIZATIONS_SERVICE_URL: str | None = None
-    DATA_SOURCE_SERVICE_URL: str | None = None
+    AUTH_SERVICE_NAME: str  
+    SERVICE_KEY_SALT: str  
+    NARRATIVE_SERVICE_URL: str  
+    CHATBOT_SERVICE_URL: str  
+    METRIC_DISCOVERY_SERVICE_URL: str  
+    METRICS_SERVICE_URL: str  
+    ORGANIZATIONS_SERVICE_URL: str  
+    DATA_SOURCE_SERVICE_URL: str  
 
     # Load Balancer ARNs
-    TARGET_GROUP_ARN: str | None = None
-    ALB_ARN: str | None = None
-    LISTENER_ARN: str | None = None
+    TARGET_GROUP_ARN: str  
+    ALB_ARN: str  
+    LISTENER_ARN: str  
 
     @property
     def DATABASE_URL(self):
