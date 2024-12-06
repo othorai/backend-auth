@@ -246,3 +246,9 @@ class NewsFeed(BaseModel):
 
     class Config:
         from_attributes = True
+
+class EmailVerificationRequest(BaseModel):
+    token: str
+
+class ResendVerificationRequest(BaseModel):
+    email: str

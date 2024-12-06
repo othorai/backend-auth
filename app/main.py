@@ -17,7 +17,9 @@ from app.schemas.schemas import (
     UserCreate, User as UserSchema, Token, ChatHistoryResponse,
     Organization as OrganizationSchema, EmailRequest, UserResponse, LikedPostResponse
 )
-from app.services.email_service import send_welcome_email
+from datetime import datetime, timedelta
+from app.services.email_service import generate_verification_token, send_verification_email, send_welcome_email
+from app.schemas.schemas import EmailVerificationRequest, ResendVerificationRequest
 import os
 from typing import Dict, Optional, List
 import logging
@@ -44,6 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 # Route prefixes and their corresponding services
 ROUTE_SERVICES = {
     'narrative': os.getenv('NARRATIVE_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-narrative-and-datasource'),
@@ -220,6 +223,8 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(org)
     
+    token = generate_verification_token()
+    
     db_user = User(
         username=user.username,
         email=user.email,
@@ -227,35 +232,106 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
         role=user.role,
         data_access=data_access,
         is_active=True,
-        is_admin=user.role.lower() in ["admin", "ceo"]
+        is_admin=user.role.lower() in ["admin", "ceo"],
+        is_verified=False,  # Initially not verified
+        verification_token=token,
+        verification_token_expires=datetime.utcnow() + timedelta(hours=24)
     )
+    
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-
+    
     # Add user to organization
     db_user.organizations.append(org)
     db.commit()
-
-    send_welcome_email(db_user.email)
+    
+    # Send verification email instead of welcome email
+    send_verification_email(db_user.email, token, FRONTEND_URL)
+    
     return db_user
+
+
+@app.post("/authorization/verify-email", include_in_schema=True)
+async def verify_email(
+    verification_data: EmailVerificationRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(
+        User.verification_token == verification_data.token,
+        User.verification_token_expires > datetime.utcnow()
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired verification token"
+        )
+    
+    if user.is_verified:
+        return {"message": "Email already verified"}
+    
+    user.is_verified = True
+    user.verification_token = None
+    user.verification_token_expires = None
+    db.commit()
+    
+    # Send welcome email after verification
+    if send_welcome_email(user.email):
+        return {"message": "Email verified successfully"}
+    else:
+        # Still return success even if welcome email fails
+        logger.error(f"Failed to send welcome email to {user.email}")
+        return {"message": "Email verified successfully but failed to send welcome email"}
+
+@app.post("/authorization/resend-verification")
+async def resend_verification(
+    email_data: ResendVerificationRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == email_data.email).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+    
+    if user.is_verified:
+        return {"message": "Email already verified"}
+    
+    # Generate new verification token
+    token = generate_verification_token()
+    user.verification_token = token
+    user.verification_token_expires = datetime.utcnow() + timedelta(hours=24)
+    db.commit()
+    
+    # Send verification email
+    send_verification_email(user.email, token, FRONTEND_URL)
+    
+    return {"message": "Verification email sent"}
 
 @app.post("/authorization/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    logging.debug(f"Login attempt for email: {form_data.username}")
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user:
-        logging.debug(f"User not found for email: {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
     if not verify_password(form_data.password, user.hashed_password):
-        logging.debug(f"Invalid password for user: {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Please verify your email before logging in",
             headers={"WWW-Authenticate": "Bearer"},
         )
     

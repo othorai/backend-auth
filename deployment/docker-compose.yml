@@ -1,7 +1,9 @@
-#docker-compose.yml
+#backend-auth/deployment/docker-compose.yml
 version: '3.8'
 services:
   app:
+    env_file:
+     - ../.env  
     build:
       context: .
       dockerfile: deployment/Dockerfile
@@ -15,6 +17,13 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SENDER_EMAIL=${SENDER_EMAIL}
+      - SENDER_NAME=Othor AI
+      - FRONTEND_URL=http://localhost:8004
     networks:
       - app-network
 

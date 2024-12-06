@@ -85,6 +85,9 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     role = Column(String(50))
     data_access = Column(Text)
+    is_verified = Column(Boolean, default=False)
+    verification_token = Column(String(100), unique=True)
+    verification_token_expires = Column(DateTime)
     
     # Add cascade delete for organization associations
     organizations = relationship(
