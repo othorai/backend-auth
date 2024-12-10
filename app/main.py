@@ -215,10 +215,10 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
     else:
         data_access = user.data_access
     
-    # Check if organization exists, if not, create it
-    org = db.query(Organization).filter(Organization.name == user.organization_name).first()
+    # Check if organization exists, if not, create it (By deafault all new users are added to dummy org for testing)
+    org = db.query(Organization).filter(Organization.name == "Wayne Enterprise").first()
     if not org:
-        org = Organization(name=user.organization_name)
+        org = Organization(name="Wayne Enterprise")
         db.add(org)
         db.commit()
         db.refresh(org)
@@ -233,7 +233,7 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
         data_access=data_access,
         is_active=True,
         is_admin=user.role.lower() in ["admin", "ceo"],
-        is_verified=False,  # Initially not verified
+        is_verified=True, # skipping verification for opensource
         verification_token=token,
         verification_token_expires=datetime.utcnow() + timedelta(hours=24)
     )
@@ -246,8 +246,8 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
     db_user.organizations.append(org)
     db.commit()
     
-    # Send verification email instead of welcome email
-    send_verification_email(db_user.email, token, FRONTEND_URL)
+    # Send verification email instead of welcome email (Skipped for opensource)
+    # send_verification_email(db_user.email, token, FRONTEND_URL)
     
     return db_user
 
@@ -753,22 +753,22 @@ async def gateway_router_delete(
         decoded_prefix = unquote(prefix).replace('%2F', '/')
         decoded_path = unquote(path).replace('%2F', '/')
         
-        # Try to find service URL
-        service_url = None
-        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
-            service_url = ROUTE_SERVICES.get("api/v1")
+        # Try to find service URL directly (this will handle hyphenated names)
+        service_url = ROUTE_SERVICES.get(decoded_prefix)
         
+        # If no direct match, then try the api/v1 special case
+        if not service_url and decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            service_url = ROUTE_SERVICES.get("api/v1")
+            forward_path = decoded_path[3:]  # Remove "v1/"
+        else:
+            forward_path = decoded_path
+
         if not service_url:
             available_services = list(ROUTE_SERVICES.keys())
             raise HTTPException(
                 status_code=404,
                 detail=f"Service not found. Available services: {available_services}"
             )
-
-        # Adjust forward path
-        forward_path = decoded_path
-        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
-            forward_path = decoded_path[3:]  # Remove "v1/"
 
         return await forward_request(
             request=request,
@@ -781,7 +781,7 @@ async def gateway_router_delete(
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(status_code=500, detail=f"Gateway DELETE error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gateway POST error: {str(e)}")
 
 @app.patch("/{prefix}/{path:path}")
 async def gateway_router_patch(

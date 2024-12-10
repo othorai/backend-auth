@@ -12,10 +12,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Email configuration
-SMTP_SERVER = os.getenv("SMTP_SERVER")  # Your organization's SMTP server
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))  # Common ports: 587 (TLS) or 465 (SSL)
-SMTP_USERNAME = os.getenv("SMTP_USERNAME", "nekende@othor.ai")  # Your org email
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")  # Your email password
+SMTP_SERVER = os.getenv("SMTP_SERVER") 
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587")) 
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", SMTP_USERNAME)
 SENDER_NAME = os.getenv("SENDER_NAME", "Othor AI")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -66,8 +66,8 @@ def generate_verification_token() -> str:
 
 def send_verification_email(email: str, token: str, frontend_url: Optional[str] = None) -> bool:
     """Send verification email with Othor AI branding"""
-    site_url = frontend_url or FRONTEND_URL
-    verification_link = f"{site_url}/verification?token={token}"
+    print(f"--------{frontend_url}-------------")
+    verification_link = f"{FRONTEND_URL}/verification?token={token}"
     
     template = Template("""
     <!DOCTYPE html>
@@ -123,7 +123,7 @@ def send_verification_email(email: str, token: str, frontend_url: Optional[str] 
     
     html_content = template.render(
         verification_link=verification_link,
-        logo_url=f"{site_url}/images/othor-logo.png",
+        logo_url=f"{FRONTEND_URL}/images/othor-logo.png",
         year=datetime.utcnow().year
     )
     
