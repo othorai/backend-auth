@@ -1,4 +1,4 @@
-#api_gateway main.py
+#services/backend_auth/main.py
 from fastapi import FastAPI, HTTPException, Depends, Request, status, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -21,7 +21,8 @@ from datetime import datetime, timedelta
 from app.services.email_service import generate_verification_token, send_verification_email, send_welcome_email
 from app.schemas.schemas import EmailVerificationRequest, ResendVerificationRequest
 import os
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
+from pydantic import BaseModel
 import logging
 import uuid
 from datetime import datetime
@@ -49,12 +50,12 @@ app.add_middleware(
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 # Route prefixes and their corresponding services
 ROUTE_SERVICES = {
-    'narrative': os.getenv('NARRATIVE_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-narrative-and-datasource'),
-    'api/v1': os.getenv('ORGANIZATIONS_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-organizations'),
-    'metrics': os.getenv('METRICS_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-metrics'),
-    'chatbot': os.getenv('CHATBOT_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com'),
-    'data-source': os.getenv('DATA_SOURCE_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-narrative-and-datasource'),
-    'metric-discovery': os.getenv('METRIC_DISCOVERY_SERVICE_UR', 'http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-metric-discovery')
+    'narrative': os.getenv('NARRATIVE_SERVICE_UR', 'http://narrative:8000'),
+    'api/v1': os.getenv('ORGANIZATIONS_SERVICE_UR', 'http://organizations:8000'),
+    'metrics': os.getenv('METRICS_SERVICE_UR', 'http://metrics:8000'),
+    'chatbot': os.getenv('CHATBOT_SERVICE_UR', 'http://chatbot:8000'),
+    'data-source': os.getenv('DATA_SOURCE_SERVICE_UR', 'http://narrative:8000'),
+    'metric-discovery': os.getenv('METRIC_DISCOVERY_SERVICE_UR', 'http://metric-discovery:8000')
 }
 
 oauth2_scheme = OAuth2PasswordBearer(
@@ -62,6 +63,30 @@ oauth2_scheme = OAuth2PasswordBearer(
     scheme_name="OAuth2PasswordBearer"
 )
 
+class Visualization(BaseModel):
+    type: str
+    axis_label: str
+    value_format: Dict[str, Any]
+    show_points: bool
+    stack_type: Optional[str] = None
+    show_labels: bool
+
+class GraphData(BaseModel):
+    current: float
+    previous: float
+    change: float
+    change_percentage: float
+    visualization: Optional[Visualization] = None
+
+class NewsArticle(BaseModel):
+    id: str
+    title: str
+    content: str
+    category: str
+    time_period: str
+    context: Optional[str] = None
+    graph_data: Dict[str, GraphData]
+    
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -456,13 +481,65 @@ async def unlike_post(
     db.commit()
     return LikedPostResponse(message="Post unliked successfully", liked=False)
 
-@app.get("/authorization/liked-posts", response_model=List[uuid.UUID])
+@app.get("/authorization/liked-posts", response_model=List[NewsArticle])
 async def get_liked_posts(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    liked_posts = db.query(LikedPost.article_id).filter(LikedPost.user_id == current_user["user"].id).all()
-    return [post.article_id for post in liked_posts]
+    """Get all liked posts with full article data."""
+    try:
+        # Get liked posts with article data in a single query using join
+        liked_articles = db.query(Article).join(
+            LikedPost, 
+            LikedPost.article_id == Article.id
+        ).filter(
+            LikedPost.user_id == current_user["user"].id,
+            Article.organization_id == current_user["current_org_id"]
+        ).all()
+
+        # Convert to NewsArticle format
+        articles = []
+        for article in liked_articles:
+            # Convert stored graph data to proper format
+            graph_data = {}
+            if article.graph_data:
+                for metric_name, data in article.graph_data.items():
+                    visualization = None
+                    if 'visualization' in data:
+                        visualization = Visualization(
+                            type=data['visualization'].get('type', 'line'),
+                            axis_label=data['visualization'].get('axis_label', 'Value'),
+                            value_format=data['visualization'].get('value_format', {}),
+                            show_points=data['visualization'].get('show_points', True),
+                            stack_type=data['visualization'].get('stack_type'),
+                            show_labels=data['visualization'].get('show_labels', True)
+                        )
+
+                    graph_data[metric_name] = GraphData(
+                        current=float(data.get('current', 0)),
+                        previous=float(data.get('previous', 0)),
+                        change=float(data.get('change', 0)),
+                        change_percentage=float(data.get('change_percentage', 0)),
+                        visualization=visualization
+                    )
+
+            articles.append(NewsArticle(
+                id=str(article.id),
+                title=article.title,
+                content=article.content,
+                category=article.category,
+                time_period=article.time_period,
+                graph_data=graph_data
+            ))
+
+        return articles
+
+    except Exception as e:
+        logger.error(f"Error fetching liked posts: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching liked posts: {str(e)}"
+        )
 
 @app.post("/authorization/find-by-email", response_model=UserResponse)
 async def find_user_by_email(
@@ -531,7 +608,7 @@ async def forward_request(
         if path.lower() == '/health':
             request_method = 'GET'
         
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             try:
                 logger.debug(f"Making request: {request_method} {full_url}")
                 logger.debug(f"Query params: {request.query_params}")
@@ -712,19 +789,15 @@ async def gateway_router_put(
         decoded_path = unquote(path).replace('%2F', '/')
         
         # Try to find service URL
-        service_url = None
-        if decoded_prefix == "api" and decoded_path.startswith("v1/"):
-            service_url = ROUTE_SERVICES.get("api/v1")
-        
-        if not service_url:
-            available_services = list(ROUTE_SERVICES.keys())
-            raise HTTPException(
-                status_code=404,
-                detail=f"Service not found. Available services: {available_services}"
-            )
+        service_url = ROUTE_SERVICES.get(decoded_prefix)
 
-        # Adjust forward path
-        forward_path = decoded_path
+        # If no direct match, then try the api/v1 special case
+        if not service_url and decoded_prefix == "api" and decoded_path.startswith("v1/"):
+            service_url = ROUTE_SERVICES.get("api/v1")
+            forward_path = decoded_path[3:]  # Remove "v1/"
+        else:
+            forward_path = decoded_path
+            
         if decoded_prefix == "api" and decoded_path.startswith("v1/"):
             forward_path = decoded_path[3:]  # Remove "v1/"
 
