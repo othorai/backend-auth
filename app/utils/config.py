@@ -1,3 +1,4 @@
+#services/backend-auth/app/utils/config.py
 from pydantic_settings import BaseSettings
 from typing import List
 from urllib.parse import quote_plus
@@ -23,40 +24,15 @@ class Settings(BaseSettings):
     # OpenAI settings
     OPENAI_API_KEY: str
 
-    # AWS settings
-    AWS_REGION: str = "eu-north-1"
-    AWS_ACCOUNT_ID: str = "533267025675"
-    AWS_ACCESS_KEY_ID: str  
-    AWS_SECRET_ACCESS_KEY: str
-    APP_NAME: str = "backend-authorization-gateway"
-    CLUSTER_NAME: str = "backend-authorization-gateway-cluster"
-    SERVICE_NAME: str = "backend-authorization-gateway-service"
-
-    # ECS Configuration
-    ECS_CPU: str = "256"
-    ECS_MEMORY: str = "512"
-    ECS_CONTAINER_PORT: str = "8000"
-
-    # VPC Configuration
-    VPC_ID: str  
-    VPC_SUBNET_1: str  
-    VPC_SUBNET_2: str  
-    SECURITY_GROUP: str  
-
-    # Service URLs
-    AUTH_SERVICE_NAME: str  
+    # Service URLs  
     SERVICE_KEY_SALT: str  
-    NARRATIVE_SERVICE_URL: str  
+    NARRATIVE_SERVICE_URL: str 
     CHATBOT_SERVICE_URL: str  
     METRIC_DISCOVERY_SERVICE_URL: str  
     METRICS_SERVICE_URL: str  
     ORGANIZATIONS_SERVICE_URL: str  
     DATA_SOURCE_SERVICE_URL: str  
 
-    # Load Balancer ARNs
-    TARGET_GROUP_ARN: str  
-    ALB_ARN: str  
-    LISTENER_ARN: str  
 
     @property
     def DATABASE_URL(self):
@@ -68,7 +44,7 @@ class Settings(BaseSettings):
         return [host.strip() for host in self.ALLOWED_HOSTS.split(',')]
 
     class Config:
-        env_file = ".env"
+        env_file = "../../../../.env"
         case_sensitive = True
         extra = "allow"  # Allow extra fields from environment variables
 
