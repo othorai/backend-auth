@@ -3,6 +3,10 @@ from pydantic_settings import BaseSettings
 from typing import List
 from urllib.parse import quote_plus
 from pathlib import Path
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     # Database settings
@@ -10,7 +14,8 @@ class Settings(BaseSettings):
     DB_NAME: str
     DB_HOST: str
     DB_PORT: str
-    DB_USER: str
+    DB_USER: str = "postgres"
+    DB_SSLMODE: str = "disable"
 
     # JWT settings
     SECRET_KEY: str
@@ -36,7 +41,7 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self):
-        url = f"postgresql://{self.DB_USER}:{quote_plus(self.DB_PASSWORD)}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?sslmode=require"
+        url = f"postgresql://{self.DB_USER}:{quote_plus(self.DB_PASSWORD)}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?sslmode={self.DB_SSLMODE}"
         return url
 
     @property
