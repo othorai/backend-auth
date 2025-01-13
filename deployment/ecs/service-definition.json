@@ -1,0 +1,27 @@
+{
+    "cluster": "${AUTH_CLUSTER_NAME}",
+    "serviceName": "${AUTH_SERVICE_NAME}",
+    "taskDefinition": "${AUTH_APP_NAME}",
+    "desiredCount": 1,
+    "launchType": "FARGATE",
+    "networkConfiguration": {
+        "awsvpcConfiguration": {
+            "subnets": [
+                "${VPC_SUBNET_1}",
+                "${VPC_SUBNET_2}"
+            ],
+            "securityGroups": [
+                "${SECURITY_GROUP}"
+            ],
+            "assignPublicIp": "ENABLED"
+        }
+    },
+    "loadBalancers": [
+        {
+            "targetGroupArn": "${AUTH_TARGET_GROUP_ARN}",
+            "containerName": "${AUTH_APP_NAME}",
+            "containerPort": 8000
+        }
+    ],
+    "healthCheckGracePeriodSeconds": 120
+}
