@@ -5,7 +5,7 @@ services:
     env_file:
      - ../../.env  
     build:
-      context: .
+      context: ..
       dockerfile: deployment/Dockerfile
     ports:
       - "8000:8000"
@@ -24,6 +24,12 @@ services:
       - SENDER_EMAIL=${SENDER_EMAIL}
       - SENDER_NAME=Othor AI
       - FRONTEND_URL=http://localhost:8004
+      - NARRATIVE_SERVICE_URL=${NARRATIVE_SERVICE_URL}
+      - CHATBOT_SERVICE_URL=${CHATBOT_SERVICE_URL}
+      - METRIC_DISCOVERY_SERVICE_URL=${METRIC_DISCOVERY_SERVICE_URL}
+      - METRICS_SERVICE_URL=${METRICS_SERVICE_URL}
+      - ORGANIZATIONS_SERVICE_URL=${ORGANIZATIONS_SERVICE_URL}
+      - DATA_SOURCE_SERVICE_URL=${DATA_SOURCE_SERVICE_URL}
     networks:
       - app-network
 

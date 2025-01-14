@@ -50,12 +50,12 @@ app.add_middleware(
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 # Route prefixes and their corresponding services
 ROUTE_SERVICES = {
-    'narrative': os.getenv('NARRATIVE_SERVICE_UR', 'http://narrative:8000'),
-    'api/v1': os.getenv('ORGANIZATIONS_SERVICE_UR', 'http://organizations:8000'),
-    'metrics': os.getenv('METRICS_SERVICE_UR', 'http://metrics:8000'),
-    'chatbot': os.getenv('CHATBOT_SERVICE_UR', 'http://chatbot:8000'),
-    'data-source': os.getenv('DATA_SOURCE_SERVICE_UR', 'http://narrative:8000'),
-    'metric-discovery': os.getenv('METRIC_DISCOVERY_SERVICE_UR', 'http://metric-discovery:8000')
+    'narrative': os.getenv('NARRATIVE_SERVICE_URL', 'http://narrative:8000'),
+    'api/v1': os.getenv('ORGANIZATIONS_SERVICE_URL', 'http://organizations:8000'),
+    'metrics': os.getenv('METRICS_SERVICE_URL', 'http://metrics:8000'),
+    'chatbot': os.getenv('CHATBOT_SERVICE_URL', 'http://chatbot:8000'),
+    'data-source': os.getenv('DATA_SOURCE_SERVICE_URL', 'http://narrative:8000'),
+    'metric-discovery': os.getenv('METRIC_DISCOVERY_SERVICE_URL', 'http://metric-discovery:8000')
 }
 
 oauth2_scheme = OAuth2PasswordBearer(

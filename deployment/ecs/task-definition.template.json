@@ -1,5 +1,5 @@
 {
-    "family": "${APP_NAME}",
+    "family": "${AUTH_APP_NAME}",
     "networkMode": "awsvpc",
     "requiresCompatibilities": ["FARGATE"],
     "cpu": "256",
@@ -7,7 +7,7 @@
     "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole",
     "containerDefinitions": [
         {
-            "name": "${APP_NAME}",
+            "name": "${AUTH_APP_NAME}",
             "image": "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${AUTH_APP_NAME}:latest",
             "portMappings": [
                 {

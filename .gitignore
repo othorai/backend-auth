@@ -3,3 +3,6 @@ venv/
 
 # Environment variables
 .env
+
+# Generated task definition
+services/backend-auth/deployment/ecs/task-definition.json

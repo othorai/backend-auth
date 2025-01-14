@@ -2,8 +2,8 @@
 
 # Function to load .env file and substitute variables
 load_env() {
-    if [ -f .env ]; then
-        export $(cat .env | sed 's/#.*//g' | xargs)
+    if [ -f ../../.env ]; then
+        export $(cat ../../.env | sed 's/#.*//g' | xargs)
 
         # If task definition template exists, substitute variables
         if [ -f deployment/ecs/task-definition.template.json ]; then
@@ -26,7 +26,7 @@ load_env() {
             echo "$output" > deployment/ecs/task-definition.json
         fi
     else
-        echo ".env file not found"
+        echo ".env file not found in root directory"
         exit 1
     fi
 }
