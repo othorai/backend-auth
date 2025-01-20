@@ -12,12 +12,13 @@ from app.utils.auth import get_current_user, create_access_token, verify_passwor
 from app.utils.database import get_db
 from sqlalchemy.orm import Session
 from urllib.parse import unquote
-from app.models.models import User, Organization, InteractionHistory, LikedPost, Article
+from app.models.models import User, Organization, InteractionHistory, LikedPost, Article, user_organizations
 from app.schemas.schemas import (
     UserCreate, User as UserSchema, Token, ChatHistoryResponse,
     Organization as OrganizationSchema, EmailRequest, UserResponse, LikedPostResponse
 )
 from datetime import datetime, timedelta
+from sqlalchemy import insert
 from app.services.email_service import generate_verification_token, send_verification_email, send_welcome_email
 from app.schemas.schemas import EmailVerificationRequest, ResendVerificationRequest
 import os
@@ -27,6 +28,8 @@ import logging
 import uuid
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
+from app.schemas.schemas import UserRole
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -240,7 +243,7 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
     else:
         data_access = user.data_access
     
-    # Check if organization exists, if not, create it (By deafault all new users are added to dummy org for testing)
+    # Check if organization exists, if not, create it
     org = db.query(Organization).filter(Organization.name == "Wayne Enterprise").first()
     if not org:
         org = Organization(name="Wayne Enterprise")
@@ -258,7 +261,7 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
         data_access=data_access,
         is_active=True,
         is_admin=user.role.lower() in ["admin", "ceo"],
-        is_verified=True, # skipping verification for opensource
+        is_verified=True,
         verification_token=token,
         verification_token_expires=datetime.utcnow() + timedelta(hours=24)
     )
@@ -267,12 +270,16 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     
-    # Add user to organization
-    db_user.organizations.append(org)
-    db.commit()
     
-    # Send verification email instead of welcome email (Skipped for opensource)
-    # send_verification_email(db_user.email, token, FRONTEND_URL)
+    # Insert into the association table with role='member'
+    db.execute(
+        insert(user_organizations).values(
+            user_id=db_user.id,
+            organization_id=org.id,
+            role="member"
+        )
+    )
+    db.commit()
     
     return db_user
 
@@ -480,6 +487,31 @@ async def unlike_post(
     db.delete(liked_post)
     db.commit()
     return LikedPostResponse(message="Post unliked successfully", liked=False)
+
+@app.get("/authorization/org_role/{org_id}", response_model=UserRole)
+async def get_user_org_role(
+    org_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the current user's role in a specific organization.
+    Returns 404 if user is not a member of the organization.
+    """
+    # Access the user object from the dictionary
+    user = current_user["user"]
+    role = user.get_org_role(org_id, db)
+    
+    if role is None:
+        raise HTTPException(
+            status_code=404,
+            detail="User is not a member of this organization"
+        )
+    
+    return UserRole(
+        organization_id=org_id,
+        role=role
+    )
 
 @app.get("/authorization/liked-posts", response_model=List[NewsArticle])
 async def get_liked_posts(
