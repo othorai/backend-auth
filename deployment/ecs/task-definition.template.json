@@ -51,6 +51,30 @@
                 {
                     "name": "DB_SSLMODE",
                     "value": "require"
+                },
+                {
+                    "name": "NARRATIVE_SERVICE_URL",
+                    "value": "${NARRATIVE_SERVICE_URL}"
+                },
+                {
+                    "name": "CHATBOT_SERVICE_URL",
+                    "value": "${CHATBOT_SERVICE_URL}"
+                },
+                {
+                    "name": "METRIC_DISCOVERY_SERVICE_URL",
+                    "value": "${METRIC_DISCOVERY_SERVICE_URL}"
+                },
+                {
+                    "name": "METRICS_SERVICE_URL",
+                    "value": "${METRICS_SERVICE_URL}"
+                },
+                {
+                    "name": "ORGANIZATIONS_SERVICE_URL",
+                    "value": "${ORGANIZATIONS_SERVICE_URL}"
+                },
+                {
+                    "name": "DATA_SOURCE_SERVICE_URL",
+                    "value": "${DATA_SOURCE_SERVICE_URL}"
                 }
             ],
             "secrets": [
@@ -69,6 +93,10 @@
                 {
                     "name": "OPENAI_API_KEY",
                     "valueFrom": "arn:aws:ssm:${AWS_REGION}:${AWS_ACCOUNT_ID}:parameter/fastapi/openai_api_key"
+                },
+                {
+                    "name": "SERVICE_KEY_SALT",
+                    "valueFrom": "arn:aws:ssm:${AWS_REGION}:${AWS_ACCOUNT_ID}:parameter/fastapi/service_key_salt"
                 }
             ],
             "logConfiguration": {

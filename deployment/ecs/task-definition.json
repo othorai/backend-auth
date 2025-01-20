@@ -39,6 +39,42 @@
                 {
                     "name": "DEBUG",
                     "value": "True"
+                },
+                {
+                    "name": "POSTGRES_SSLMODE",
+                    "value": "require"
+                },
+                {
+                    "name": "PGSSLMODE",
+                    "value": "require"
+                },
+                {
+                    "name": "DB_SSLMODE",
+                    "value": "require"
+                },
+                {
+                    "name": "NARRATIVE_SERVICE_URL",
+                    "value": "http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-narrative-and-datasource"
+                },
+                {
+                    "name": "CHATBOT_SERVICE_URL",
+                    "value": "http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com"
+                },
+                {
+                    "name": "METRIC_DISCOVERY_SERVICE_URL",
+                    "value": "http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-metric-discovery"
+                },
+                {
+                    "name": "METRICS_SERVICE_URL",
+                    "value": "http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-metrics"
+                },
+                {
+                    "name": "ORGANIZATIONS_SERVICE_URL",
+                    "value": "http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-organizations"
+                },
+                {
+                    "name": "DATA_SOURCE_SERVICE_URL",
+                    "value": "http://backend-chatbot-alb-1422393530.eu-north-1.elb.amazonaws.com/backend-narrative-and-datasource"
                 }
             ],
             "secrets": [
@@ -57,6 +93,10 @@
                 {
                     "name": "OPENAI_API_KEY",
                     "valueFrom": "arn:aws:ssm:eu-north-1:533267025675:parameter/fastapi/openai_api_key"
+                },
+                {
+                    "name": "SERVICE_KEY_SALT",
+                    "valueFrom": "arn:aws:ssm:eu-north-1:533267025675:parameter/fastapi/service_key_salt"
                 }
             ],
             "logConfiguration": {

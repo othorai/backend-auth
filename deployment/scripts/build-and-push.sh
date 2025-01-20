@@ -25,6 +25,13 @@ docker buildx build \
     --build-arg DB_PORT=$DB_PORT \
     --build-arg DB_NAME=$DB_NAME \
     --build-arg DB_NAME=$DB_SSLMODE \
+    --build-arg SERVICE_KEY_SALT=$SERVICE_KEY_SALT \
+    --build-arg NARRATIVE_SERVICE_URL=$NARRATIVE_SERVICE_URL \
+    --build-arg CHATBOT_SERVICE_URL=$CHATBOT_SERVICE_URL \
+    --build-arg METRIC_DISCOVERY_SERVICE_URL=$METRIC_DISCOVERY_SERVICE_URL \
+    --build-arg METRICS_SERVICE_URL=$METRICS_SERVICE_URL \
+    --build-arg ORGANIZATIONS_SERVICE_URL=$ORGANIZATIONS_SERVICE_URL \
+    --build-arg DATA_SOURCE_SERVICE_URL=$DATA_SOURCE_SERVICE_URL \
     -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$AUTH_APP_NAME:latest \
     -f deployment/Dockerfile . || handle_error "Failed to build and push image"
 
